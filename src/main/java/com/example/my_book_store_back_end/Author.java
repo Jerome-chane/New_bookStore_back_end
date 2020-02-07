@@ -21,6 +21,7 @@ public class Author {
     private String userName;
     private String email;
     private String password;
+    private String role;
 
 
     @OneToMany(mappedBy="author", fetch=FetchType.EAGER)
@@ -34,14 +35,10 @@ public class Author {
         this.userName = userName;
         this.email = email;
         this.password = password;
+
     }
 
-
-
-
-
     public void addBook(Book book){ this.books.add(book); } // add a book to the Author's collection
-
     public Set<Book> getBooks() { return books; } // return all the Author's books
     public Long getId() {
         return id;
