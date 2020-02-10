@@ -4,7 +4,6 @@ import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.*;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Set;
 
 
@@ -21,7 +20,7 @@ public class Purchase {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name="customer_id")
-    private Customer customer;
+    private Person customer;
 
 //
 //    @OneToMany(mappedBy="purchase", fetch = FetchType.EAGER)
@@ -34,19 +33,18 @@ Set<Book> books;
     public Purchase() {
 
     }
-    public Purchase(Customer customer,Set<Book> bookSet, Date date) {
-        customer.addPurchase(this);
-        this.customer = customer;
+    public Purchase(Person person ,Set<Book> bookSet, Date date) {
+        person.addPurchase(this);
+        this.customer = person;
         this.date = date;
         this.books = bookSet;
     }
-
     public void addBook(Book book){ books.add(book); };
     public Long getId() {
         return id;
     }
 
-    public Customer getCustomer() {
+    public Person getCustomer() {
         return customer;
     }
 

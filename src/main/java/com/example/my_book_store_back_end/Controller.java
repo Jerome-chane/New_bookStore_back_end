@@ -5,16 +5,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.xml.ws.Response;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,26 +23,55 @@ public class Controller {
     @Autowired
     private BookRepository bookRepository;
     @Autowired
-    private AuthorRepository authorRepository;
+    private PersonRepository personRepository;
     @Autowired
-    private CustomerRepository customerRepository;
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private PurchaseResository purchaseResository;
 
-    public Author getAuthPerson(Authentication authentication) {
-        return authorRepository.findByEmail(authentication.getName());
+
+    public Person getAuthPerson(Authentication authentication) {
+        return personRepository.findByEmail(authentication.getName());
     }
+
+    @RequestMapping(value = "/purchase", method = RequestMethod.POST)
+    public ResponseEntity<Map<String, Object>> purchase(@RequestBody Set<Book> books, Authentication authentication) {
+
+        if(isGuest(authentication)){
+            return new ResponseEntity<>(makeMap("error", "You must be logged is to make a purchase"), HttpStatus.UNAUTHORIZED);
+        }
+        Person customer = getAuthPerson(authentication);
+        Date date = new Date();
+        Set<Book> bookSet = new HashSet<>();
+        for (Book book : books){
+            bookSet.add(bookRepository.findByTitle(book.getTitle()));
+        }
+        Purchase newPurchase = new Purchase(customer,bookSet,date);
+        purchaseResository.save(newPurchase);
+        return new ResponseEntity<>(makeMap("success","Purchase realized"),HttpStatus.CREATED);
+    }
+
+
     @RequestMapping("/api/customers") // Return an API with all the books
     public Map<String, Object>  getCustomers() {
+
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
-        dto.put("customers", customerRepository.findAll().stream().map(customer -> CustomerDTO(customer)).collect(Collectors.toList()));
+        Set<Person> customers = new HashSet<>();
+        personRepository.findAll().stream().map(person ->{if (person.getRole().contentEquals("customer")){customers.add(person);}return customers;}).collect(Collectors.toList());
+// check in the personRespository which Person as the role of "customer" and add these persons to the Set of Customers
+        dto.put("customers", customers.stream().map(customer->CustomerDTO(customer)).collect(Collectors.toList()));
         return dto;
     }
     @RequestMapping("/api/authors") // Return an API with all the books
     public Map<String, Object>  getAuthors() {
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
-        dto.put("authors", authorRepository.findAll().stream().map(author -> AuthorDTO(author)).collect(Collectors.toList()));
+        Set<Person> authors = new HashSet<>();
+        personRepository.findAll().stream().map(person ->{if (person.getRole().contentEquals("author")){authors.add(person);}return authors;}).collect(Collectors.toList());
+        // check in the personRespository which Person as the role of "author" and add these persons to the Set of Authors
+        dto.put("authors", authors.stream().map(author->AuthorDTO(author)).collect(Collectors.toList()));
         return dto;
     }
-    private Map<String, Object> CustomerDTO(Customer customer) {
+    private Map<String, Object> CustomerDTO(Person customer) {
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
         dto.put("firstName", customer.getFirstName());
         dto.put("lastName", customer.getLastName());
@@ -52,12 +79,12 @@ public class Controller {
         dto.put("email", customer.getEmail());
         dto.put("purchases", customer.getPurchases().stream().map(purchase ->PurchaseDTO(purchase)));
         return dto;
-    }    private Map<String, Object> CustomerPurchaseDTO(Customer customer) {
+    }    private Map<String, Object> CustomerPurchaseDTO(Person customer) {
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
         dto.put("firstName", customer.getFirstName());
         dto.put("lastName", customer.getLastName());
         dto.put("userName", customer.getUserName());
-        dto.put("email", customer.getEmail());
+//        dto.put("email", customer.getEmail());
 
         return dto;
     }
@@ -82,7 +109,7 @@ public class Controller {
 
         return  dto;
     }
-    private Map<String, Object> AuthorDTOforBook(Author author) {  // makes the Book DTO
+    private Map<String, Object> AuthorDTOforBook(Person author) {  // makes the Book DTO
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
         dto.put("firstName", author.getFirstName());
         dto.put("lastName", author.getLastName());
@@ -91,7 +118,7 @@ public class Controller {
         return dto;
     }
 
-    private Map<String, Object> AuthorDTO(Author author) {  // makes the Book DTO
+    private Map<String, Object> AuthorDTO(Person author) {  // makes the Book DTO
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
         dto.put("firstName", author.getFirstName());
         dto.put("lastName", author.getLastName());
@@ -115,6 +142,7 @@ public class Controller {
     public Map<String, Object>  getAll(Authentication authentication) {
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
 
+
         if (isGuest(authentication)) {
             dto.put("logged", null);
         } else {
@@ -126,13 +154,14 @@ public class Controller {
 
     private Map<String, Object> BookDTO(Book book) {  // makes the Book DTO
         Map<String, Object> dto = new LinkedHashMap<String, Object>();
-//        System.out.println("BOOKS PURCHASES"+ book.getPurchases());
-        System.out.println("BOOKS CUSTOMER"+ book.getPurchases().stream().map(purchase -> purchase.getCustomer()).collect(Collectors.toList()));
+        dto.put("id", book.getId());
         dto.put("cover", book.getCover());
         dto.put("detail", book.getDetail());
         dto.put("title", book.getTitle());
         dto.put("description", book.getDescription());
         dto.put("language", book.getLanguage());
+        dto.put("price", book.getPrice());
+
         if(book.getAuthor()==null) {
             dto.put("author", "unknown");
         }if(book.getAuthor()!=null) {
@@ -147,47 +176,50 @@ public class Controller {
     }
 
 
-
-
     @RequestMapping(value= "/api/addBook", method = RequestMethod.POST) // Create a book
     public ResponseEntity<Map<String,Object>> newBook(@RequestBody Book book, Authentication authentication) {
-        if (isGuest(authentication)) {
+
+        Person person = getAuthPerson(authentication);
+        if (isGuest(authentication) || !person.getRole().contentEquals("author")) { // Check is the current user is an Author
             return new ResponseEntity<>(makeMap("error", "You must be logged in as an Author to add a book"), HttpStatus.UNAUTHORIZED);
         }
-        // MUST CHECK IF USER IS AUTHOR BEFORE CREATING
-        Book isBook = bookRepository.findByTitle(book.getTitle());
 
+        Book isBook = bookRepository.findByTitle(book.getTitle());
         if (isBook != null) {
         return new ResponseEntity<>(makeMap("error", "This book already exists"), HttpStatus.CONFLICT);
         }
-            Author author = getAuthPerson(authentication);
-            Book newBook = new Book(book.getTitle(), book.getLanguage(), book.getDescription(), book.getCover(), book.getDetail(),author);
-            author.addBook(newBook);
-
+            Book newBook = new Book(book.getTitle(), book.getLanguage(), book.getDescription(), book.getCover(), book.getDetail(),book.getPrice(),person);
+            person.addBook(newBook);
             bookRepository.save(newBook);
             return new ResponseEntity<>(makeMap("success", "New book added"), HttpStatus.ACCEPTED);
 
-
     }
 
 
-    @RequestMapping(value = "/api/signup/author", method = RequestMethod.POST)
-    public ResponseEntity<Map<String, Object>> addAuthor(@RequestBody Author author) { // Add an Author
-        Author isAuthor = authorRepository.findByEmail(author.getEmail());
-        if (isAuthor != null) {
-            return new ResponseEntity<>(makeMap("error","Author already exists"),HttpStatus.CONFLICT);
+
+    @RequestMapping(value = "/api/signup", method = RequestMethod.POST)
+    public ResponseEntity<Map<String, Object>> addPerson(@RequestBody Person person) { // Add a Perosn
+        Person isPerson = personRepository.findByEmail(person.getEmail());
+        if (isPerson != null) {
+            return new ResponseEntity<>(makeMap("error","Person already exists"),HttpStatus.CONFLICT);
         }
-            Author newAuthor = new Author(author.getFirstName(), author.getLastName(), author.getUserName(), author.getEmail(), author.getPassword());
-            authorRepository.save(newAuthor);
-            System.out.println("Author saved: " + newAuthor);
-        return new ResponseEntity<>(makeMap("success","Author Added"),HttpStatus.CREATED);
-    }
-    private Map<String, Object> loginDTO(Authentication authentication) {
-        Map<String, Object> dto = new LinkedHashMap<String, Object>();
-        dto.put("firstname", authorRepository.findByEmail(authentication.getName()).getFirstName());
-        dto.put("lastname", authorRepository.findByEmail(authentication.getName()).getLastName());
-        dto.put("username", authorRepository.findByEmail(authentication.getName()).getUserName());
+        Person newPerson = new Person(person.getFirstName(), person.getLastName(), person.getUserName(), person.getEmail(),person.getRole() ,passwordEncoder.encode(person.getPassword()));
+        personRepository.save(newPerson);
 
+        return new ResponseEntity<>(makeMap("success","Person Added"),HttpStatus.CREATED);
+    }
+
+
+    private Map<String, Object> loginDTO(Authentication authentication) { // Loging DTO will check which user is logged in and will return the apropriate information
+        Map<String, Object> dto = new LinkedHashMap<String, Object>();
+        Person person = getAuthPerson(authentication);
+
+        if(person != null) {
+            dto.put("role", personRepository.findByEmail(authentication.getName()).getRole());
+            dto.put("firstname", personRepository.findByEmail(authentication.getName()).getFirstName());
+            dto.put("lastname", personRepository.findByEmail(authentication.getName()).getLastName());
+            dto.put("username", personRepository.findByEmail(authentication.getName()).getUserName());
+        }
         return dto;
     }
     private Map<String, Object> makeMap(String key, Object value) { // Makes the response sent with the response entity

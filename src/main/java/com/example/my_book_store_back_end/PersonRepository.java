@@ -6,7 +6,7 @@ import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 
 
 @RepositoryRestResource
-public interface AuthorRepository extends JpaRepository<Author, Long> {
-    Author findByEmail(@Param("email") String email);
+public interface PersonRepository extends JpaRepository<Person, Long> {
+    Person findByEmail(@Param("email") String email);
 
 }

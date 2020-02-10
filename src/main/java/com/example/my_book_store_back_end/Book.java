@@ -19,10 +19,11 @@ public class Book {
         private String description;
         private String cover;
         private String detail;
+        private Integer price;
 
         @ManyToOne(fetch = FetchType.EAGER)
         @JoinColumn(name="author_id")
-        private Author author;
+        private Person author;
 
 //         @ManyToOne(fetch = FetchType.EAGER)
 //         @JoinColumn(name="purchase_id")
@@ -34,34 +35,32 @@ Set<Purchase> purchases;
 
         public Book() { }
 
-        public Book(String title,String language, String description, String cover, String detail, Author author) {
+        public Book(String title,String language, String description, String cover, String detail,Integer price, Person author) {
            this.title = title;
            this.language = language;
            this.description = description;
            this.cover = cover;
            this.detail = detail;
+           this.price = price;
            if(author!=null) {
                author.addBook(this);
                 this.author = author;}
         }
 
-    public Set<Purchase> getPurchases() {
-        return purchases;
-    }
 
-    //    public Purchase getPurchase() { return purchase; }
-    public Author getAuthor() { return author; }
-    public String getTitle() { return title; }
-    public String getCover() { return cover;}
+
+        public Integer getPrice() { return price; }
+        public long getId() { return id; }
+        public Person getAuthor() { return author; }
+        public String getTitle() { return title; }
+        public String getCover() { return cover;}
         public String getDescription() { return description; }
         public String getDetail() { return detail; }
         public String getLanguage() { return language; }
 
-         public void addPurchase(Purchase purchase){
-//            purchase.addBook(this);
-            this.purchases.add(purchase)
-         ; }
-
+        public void addPurchase(Purchase purchase){ this.purchases.add(purchase);}
+        public Set<Purchase> getPurchases() {return purchases; }
+        public void setPrice(Integer price) { this.price = price; }
         public void setTitle(String title) { this.title = title; }
         public void setCover(String cover) { this.cover = cover; }
         public void setDescription(String description) { this.description = description; }
@@ -71,11 +70,15 @@ Set<Purchase> purchases;
     @Override
     public String toString() {
         return "Book{" +
-                "title='" + title + '\'' +
-//                ", cover='" + cover + '\'' +
-//                ", detail='" + detail + '\'' +
+                "id=" + id +
+                ", title='" + title + '\'' +
+//                ", language='" + language + '\'' +
 //                ", description='" + description + '\'' +
-                ", language='" + language + '\'' +
+                ", cover='" + cover + '\'' +
+//                ", detail='" + detail + '\'' +
+//                ", price=" + price +
+//                ", author=" + author +
+//                ", purchases=" + purchases +
                 '}';
     }
 }

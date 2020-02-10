@@ -43,24 +43,22 @@ public class MyBookStoreBackEndApplication {
 	}
 
 	@Bean
-	public CommandLineRunner initData(BookRepository bookRepository, AuthorRepository authorRepository,CustomerRepository customerRepository,PurchaseResository purchaseResository) {
+	public CommandLineRunner initData(BookRepository bookRepository, PersonRepository personRepository,PurchaseResository purchaseResository) {
 		return (args) -> {
 			// save a couple of users
-Book b1 = new Book("Tell me in words","es","The multifaceted catalan writer show us in his most romantic novel how, basically, our relationship is as easy as saying things clear. That's it.","https://preview.ibb.co/bC5ELQ/alex_min.png","https://preview.ibb.co/deD10Q/alex_min.png", null);
-Book b2 = new Book("I see it black","es","Sometimes you think you understand something when someone explains it you, but when you have to code you come up with a doubt. Can you see it? Eduard Catala takes out his sleeve a science fiction master piece.","https://preview.ibb.co/dvM9AQ/eddie_min.png","https://preview.ibb.co/hnT0H5/eddie_min.png",null);
-Book b3 = new Book("My algorithm is faster","es","Once again Warrior, once again the arrow. This is a book that will have you hooked from the moment you open its cover. It hooks you up fast, very fast, hyper fast.","https://preview.ibb.co/nF3Un5/flecha_min.png","https://preview.ibb.co/dUgbZk/flecha_min.png", null);
+Book b1 = new Book("Tell me in words","es","The multifaceted catalan writer show us in his most romantic novel how, basically, our relationship is as easy as saying things clear. That's it.","https://preview.ibb.co/bC5ELQ/alex_min.png","https://preview.ibb.co/deD10Q/alex_min.png", 50,null);
+Book b2 = new Book("I see it black","es","Sometimes you think you understand something when someone explains it you, but when you have to code you come up with a doubt. Can you see it? Eduard Catala takes out his sleeve a science fiction master piece.","https://preview.ibb.co/dvM9AQ/eddie_min.png","https://preview.ibb.co/hnT0H5/eddie_min.png",15,null);
+Book b3 = new Book("My algorithm is faster","es","Once again Warrior, once again the arrow. This is a book that will have you hooked from the moment you open its cover. It hooks you up fast, very fast, hyper fast.","https://preview.ibb.co/nF3Un5/flecha_min.png","https://preview.ibb.co/dUgbZk/flecha_min.png",20, null);
 bookRepository.save(b1);bookRepository.save(b2);bookRepository.save(b3);
-Author a1 = new Author("Jerome", "Chane", "j", "j.com", passwordEncoder().encode("123"));
-authorRepository.save(a1);
-Customer c1 = new Customer("Mr", "Potatoe", "Mr.P", "Mr.P.com", "123");
-customerRepository.save(c1);
+			Person a1 = new Person("Jerome", "Chane", "j", "j.com","author", passwordEncoder().encode("123"));
+personRepository.save(a1);
+			Person c1 = new Person("Mr", "Potatoe", "Mr.P", "Mr.P.com","customer", passwordEncoder().encode("123"));
+personRepository.save(c1);
 
 			Date date = new Date();
 			Set<Book> set1 = new HashSet<>();set1.add(b1);set1.add(b3);
 			Purchase purchase1 = new Purchase(c1,set1,date);
 			purchaseResository.save(purchase1);
-
-
 
 		};
 	}
@@ -71,16 +69,18 @@ customerRepository.save(c1);
 @Configuration
 class WebSecurityConfiguration extends GlobalAuthenticationConfigurerAdapter {
 	@Autowired
-	AuthorRepository authorRepository;
+	PersonRepository personRepository;
+
 	@Override
 	public void init(AuthenticationManagerBuilder auth) throws Exception {
 		auth.userDetailsService(inputName-> {
+			Person person = personRepository.findByEmail(inputName);
 
-			Author author = authorRepository.findByEmail(inputName);
-			if (author != null) {
-				return new User(author.getEmail(), author.getPassword(),
-						AuthorityUtils.createAuthorityList("AUTHOR"));
-			} else {
+			if (person != null) {
+				return new User(person.getEmail(), person.getPassword(),
+						AuthorityUtils.createAuthorityList(person.getRole()));
+			}
+			else {
 				throw new UsernameNotFoundException("Unknown user: " + inputName);
 			}
 		});
@@ -95,11 +95,13 @@ class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 		http.authorizeRequests()
 				.antMatchers("/api/**").permitAll()
 				.antMatchers("/api/signup/**").permitAll()
-//				.antMatchers("/api/login").permitAll()
+				.antMatchers("/api/login").permitAll()
 				.antMatchers("/h2-console/**").permitAll()
 				.antMatchers("/login.html").permitAll()
 				.antMatchers("/login.js").permitAll()
-				.antMatchers("/addBook").hasAnyAuthority("AUTHOR")
+				.antMatchers("/addBook").hasAnyAuthority("author")
+				.antMatchers("/purchase").permitAll()
+//				.antMatchers("/purchase").hasAnyAuthority("CUSTOMER","AUTHOR") // FOR PURCHASE USE AND TEST
 				.anyRequest()
 				.fullyAuthenticated();
 		http.formLogin()

@@ -10,7 +10,7 @@ import java.util.Set;
 
 
 @Entity
-public class Author {
+public class Person {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "native")
@@ -27,18 +27,27 @@ public class Author {
     @OneToMany(mappedBy="author", fetch=FetchType.EAGER)
     Set<Book> books = new HashSet<>();
 
-    public Author() { }
 
-    public Author(String first, String last, String userName, String email, String password) {
+    @OneToMany(mappedBy="customer", fetch=FetchType.EAGER)
+    Set<Purchase> purchases = new HashSet<>();
+
+    public Person() { }
+
+    public Person(String first, String last, String userName, String email, String role, String password) {
         this.firstName = first;
         this.lastName = last;
         this.userName = userName;
         this.email = email;
+        this.role = role;
         this.password = password;
 
     }
 
-    public void addBook(Book book){ this.books.add(book); } // add a book to the Author's collection
+    public String getRole() { return role; }
+
+    public Set<Purchase> getPurchases() {return purchases; }
+
+    public void setRole(String role) { this.role = role;}
     public Set<Book> getBooks() { return books; } // return all the Author's books
     public Long getId() {
         return id;
@@ -57,6 +66,8 @@ public class Author {
     }
     public String getPassword() { return password; }
 
+    public void addBook(Book book){ this.books.add(book); } // add a book to the Author's collection
+    public void addPurchase(Purchase purchase){this.purchases.add(purchase);}
     public void setFirstName(String firstName) {
         this.firstName = firstName;
     }
